@@ -1,0 +1,68 @@
+name: "Database Migration Action"
+description: "A GitHub Action to perform database migrations using Flyway."
+author: "thierry.p.broucke@altice.pt"
+
+inputs:
+  DATABASE:
+    description: "Database name"
+    required: true
+  JDBC:
+    description: "JDBC connection string"
+    required: true
+  PASSWORD:
+    description: "Database password"
+    required: true
+  USERNAME:
+    description: "Database username"
+    required: true
+  SCHEMAS:
+    description: "Database schemas"
+    required: false
+  DIALECT:
+    description: "Database dialect (e.g., mysql, postgresql)"
+    required: true
+  REPO_NAME:
+    description: "Repository name"
+    required: true
+  ROOT_PASSWORD:
+    description: "Root password for the database in the dummy environment"
+    required: true
+  FLYWAY_LOCATIONS:
+    description: "Location(s) where Flyway will search for migration files"
+    required: true
+  FLYWAY_USER:
+    description: "Flyway authentication username"
+    required: true
+  FLYWAY_PASSWORD:
+    description: "Flyway authentication password"
+    required: true
+
+outputs:
+  DBVERSION:
+    description: "The database version"
+
+#runs:
+#  using: "composite"
+#  steps:
+#    - run: |
+#        chmod +x ./entrypoint.sh
+#        ./entrypoint.sh "${{ inputs.DATABASE }}" "${{ inputs.JDBC }}" "${{ inputs.PASSWORD }}" "${{ inputs.USERNAME }}" "${{ inputs.SCHEMAS }}" "${{ inputs.DIALECT }}" "${{ inputs.REPO_NAME }}" "${{ inputs.ROOT_PASSWORD }}" "${{ inputs.FLYWAY_LOCATIONS }}" "${{ inputs.FLYWAY_USER }}" "${{ inputs.FLYWAY_PASSWORD }}" "${{ github.workspace }}"
+#      shell: bash
+
+#OR using docker
+runs:
+  using: "docker"
+  #image: "Dockerfile"
+  image: "docker://registry.ansible.telecom.pt/repository/osdba/flyway"
+  env:
+    DATABASE: ${{ inputs.DATABASE }}
+    JDBC: ${{ inputs.JDBC }}
+    PASSWORD: ${{ inputs.PASSWORD }}
+    USERNAME: ${{ inputs.USERNAME }}
+    SCHEMAS: ${{ inputs.SCHEMAS }}
+    DIALECT: ${{ inputs.DIALECT }}
+    REPO_NAME: ${{ inputs.REPO_NAME }}
+    ROOT_PASSWORD: ${{ inputs.ROOT_PASSWORD }}
+    FLYWAY_LOCATIONS: ${{ inputs.FLYWAY_LOCATIONS }}
+    FLYWAY_USER: ${{ inputs.FLYWAY_USER }}
+    FLYWAY_PASSWORD: ${{ inputs.FLYWAY_PASSWORD }}

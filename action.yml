@@ -1,0 +1,129 @@
+name: "Database Migration Action (Docker)"
+description: "A GitHub Action to perform database migrations using Flyway in a Docker container."
+author: "thierry.p.broucke@altice.pt"
+
+inputs:
+  DATABASE:
+    description: "Database name"
+    required: false
+  JDBC:
+    description: "JDBC connection string"
+    required: true
+  PASSWORD:
+    description: "Database password"
+    required: true
+  USERNAME:
+    description: "Database username"
+    required: true
+  QA_JDBC:
+    description: "JDBC connection string for QA"
+    required: false
+  QA_PASSWORD:
+    description: "Database password for QA"
+    required: false
+  SCHEMAS:
+    description: "Database schemas"
+    required: false
+    default: ""
+  DIALECT:
+    description: "Database dialect (mysql, postgresql, oracle)"
+    required: true
+  REPO_NAME:
+    description: "Repository name"
+    required: true
+  ROOT_PASSWORD:
+    description: "Root password for the database in the dummy environment"
+    required: false
+  FLYWAY_LOCATIONS:
+    description: "Location(s) where Flyway will search for migration files"
+    required: false
+    default: "migrations"
+  FLYWAY_USER:
+    description: "Flyway authentication username"
+    required: false
+  FLYWAY_PASSWORD:
+    description: "Flyway authentication password"
+    required: false
+  FLYWAY_CLI_INSTALL_CHECK:
+    description: "Define if should check for existing flyway or not"
+    required: false
+    default: "true"
+  FLYWAY_VERSION:
+    description: "Flyway version"
+    required: false
+    default: "10.20.1"
+  FLYWAY_INSTALL_DIRECTORY:
+    description: "Where the cli should be installed, default is local dir then it will create a symbolic link to /usr/bin"
+    required: false
+    default: ""
+  OCI_TARGET_TDE_WALLET_ID:
+    description: "Target tde-wallet, needed on the process of creating / cloning PDBS"
+    required: false
+  OCI_TARGET_CID:
+    description: "Target Container OCID"
+    required: false
+  OCI_CLI_USER:
+    description: "User OCID used for the oci-cli"
+    required: false
+  OCI_CLI_TENANCY:
+    description: "Tenancy OCID"
+    required: false
+  OCI_CLI_REGION:
+    description: "Region"
+    required: false
+  OCI_CLI_FINGERPRINT:
+    description: "Fingerprint generated"
+    required: false
+  OCI_CLI_KEY_CONTENT:
+    description: "Api Key private key"
+    required: false
+  OCI_PDB_ID:
+    description: "Source PDB ID"
+    required: false
+  OCI_SOURCE_QCARBON_KEY:
+    description: "Key from Source database"
+    required: false
+  OCI_CDB_ID:
+    description: "OCI_CDB_ID from Destination CDB"
+    required: false
+  RUN_ON_PROD:
+    description: "Temporary Bypass to test dummy only"
+    required: false
+    default: true
+  RUN_ON_QA:
+    description: "Temporary ByPass to test dummy only"
+    required: false
+    default: true
+
+runs:
+  using: "docker"
+  image: "Dockerfile"
+  args:
+    - ${{ inputs.DATABASE }}
+    - ${{ inputs.JDBC }}
+    - ${{ inputs.PASSWORD }}
+    - ${{ inputs.USERNAME }}
+    - ${{ inputs.QA_JDBC }}
+    - ${{ inputs.QA_PASSWORD }}
+    - ${{ inputs.SCHEMAS }}
+    - ${{ inputs.DIALECT }}
+    - ${{ inputs.REPO_NAME }}
+    - ${{ inputs.ROOT_PASSWORD }}
+    - ${{ inputs.FLYWAY_LOCATIONS }}
+    - ${{ inputs.FLYWAY_USER }}
+    - ${{ inputs.FLYWAY_PASSWORD }}
+    - ${{ inputs.FLYWAY_CLI_INSTALL_CHECK }}
+    - ${{ inputs.FLYWAY_VERSION }}
+    - ${{ inputs.FLYWAY_INSTALL_DIRECTORY }}
+    - ${{ inputs.OCI_TARGET_TDE_WALLET_ID }}
+    - ${{ inputs.OCI_TARGET_CID }}
+    - ${{ inputs.OCI_CLI_USER }}
+    - ${{ inputs.OCI_CLI_TENANCY }}
+    - ${{ inputs.OCI_CLI_REGION }}
+    - ${{ inputs.OCI_CLI_FINGERPRINT }}
+    - ${{ inputs.OCI_CLI_KEY_CONTENT }}
+    - ${{ inputs.OCI_PDB_ID }}
+    - ${{ inputs.OCI_SOURCE_QCARBON_KEY }}
+    - ${{ inputs.OCI_CDB_ID }}
+    - ${{ inputs.RUN_ON_PROD }}
+    - ${{ inputs.RUN_ON_QA }}

@@ -1,0 +1,69 @@
+name: 'Build & Migrate - flywaydb'
+description: 'Executes the Migration of .sql files'
+inputs:
+  databaseName:
+    description: 'The name of the database'
+    required: true
+  JDBC:
+    description: 'The JDBC connection string'
+    required: true
+  userName:
+    description: 'The database username'
+    required: true
+  password:
+    description: 'The database password'
+    required: true
+  schemas:
+    description: 'The database schemas'
+    required: true
+  FLYWAY_USER:
+    description: 'The Flyway user'
+    required: true
+  FLYWAY_PASSWORD:
+    description: 'The Flyway password'
+    required: true
+  pauseForCodeReview:
+    description: 'Whether to pause for code review'
+    required: true
+runs:
+  using: 'composite'
+  steps:
+      - name: Authenticate with Flyway
+        run: |
+          /opt/flyway/flyway/flyway auth -user="${{ inputs.FLYWAY_USER }}" -password="${{ inputs.FLYWAY_PASSWORD }}" -logout
+        shell: bash
+
+      # Runs the Flyway Migrate against the Production database
+      - name: Migrate Build DB
+        if: ${{ true }}
+        run: |
+          FLYWAY_OUTPUT_FILE=$(mktemp)
+          eval /opt/flyway/flyway/flyway -user="${{ inputs.userName }}" -password="${{ inputs.password }}" -baselineOnMigrate="true" -configFiles="${{ GITHUB.WORKSPACE }}/flyway.toml" -locations="filesystem:${{ GITHUB.WORKSPACE }}/*/migrations" info migrate info -url="${{ inputs.JDBC }}" -cleanDisabled='false' | tee "$FLYWAY_OUTPUT_FILE"
+          echo ":rocket:" >> $GITHUB_STEP_SUMMARY
+          RESULT=$(cat $FLYWAY_OUTPUT_FILE  | sed '/+-----------+-------------+-------------+------+---------------------+---------+----------+/d' | grep "Schema version" -A9999 | tail -n +3 )
+          html_table=$(echo "$RESULT" | awk 'BEGIN {
+          FS="|";
+          print "<table>";
+          print "<tr><th>Category</th><th>Version</th><th>Description</th><th>Type</th><th>Installed On</th><th>State</th><th>Undoable</th></tr>"
+          }
+          NR>2 && NF {
+          gsub(/^ +| +$/,"",$2);
+          gsub(/^ +| +$/,"",$3);
+          gsub(/^ +| +$/,"",$4);
+          gsub(/^ +| +$/,"",$5);
+          gsub(/^ +| +$/,"",$6);
+          gsub(/^ +| +$/,"",$7);
+          state = $7;
+          if (state == "Success") {
+           state = state " :green_circle: ";
+           }
+          else 
+            state = state " :red_circle: " 
+          gsub(/^ +| +$/,"",$8);
+          print "<tr><td>"$2"</td><td>"$3"</td><td>"$4"</td><td>"$5"</td><td>"$6"</td><td>"state"</td><td>"$8"</td></tr>"
+          }
+          END {
+          print "</table>"
+          }')
+          echo "$html_table" >> $GITHUB_STEP_SUMMARY
+        shell: bash

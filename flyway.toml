@@ -1,0 +1,50 @@
+databaseType = "MySql"
+name = "flywaysample"
+id = "3f2fbad1-d01e-44ae-a5ed-122539902868"
+baselineOnMigrate=true
+
+[flywayDesktop]
+developmentEnvironment = "development"
+shadowEnvironment = "shadow"
+schemaModel = "./schema-model"
+
+  [flywayDesktop.generate]
+  undoScripts = true
+
+[redgateCompare]
+filterFile = "filter.rgf"
+
+[redgateCompare.mysql.options.ignores]
+ignoreNewlinesInTextObjects = "off"
+
+[flyway]
+mixed = true
+outOfOrder = true
+locations = [ "filesystem:migrations" ]
+validateMigrationNaming = true
+
+[environments.shadow]
+url = "jdbc:mysql://192.168.1.21:3306"
+schemas = [ "batman" ]
+displayName = "Shadow database"
+provisioner = "clean"
+
+[environments.coffeeshopdev]
+url = "jdbc:mysql://192.168.1.21:3306"
+schemas = [ "coffeeshop_dev" ]
+displayName = "Development"
+
+[environments.prod]
+url = "jdbc:mysql://192.168.1.36:3306"
+schemas = [ "mcdonalds" ]
+displayName = "Production"
+
+[environments.build]
+url = "jdbc:mysql://192.168.1.21:3306"
+schemas = [ "coffeeshop" ]
+displayName = "build"
+
+[environments.coffeeshopshadow]
+url = "jdbc:mysql://192.168.1.21:3306"
+schemas = [ "coffeeshop_shadow" ]
+displayName = "Shadow"

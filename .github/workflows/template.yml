@@ -1,0 +1,40 @@
+name: Development Workflow
+
+on:
+  push:
+    branches:
+        - development #Ao ser aplicado o push para a branch development, o workflow será executado
+  pull_request:
+    types:
+      - closed
+
+jobs: 
+  lint-and-migrate:
+    runs-on: runner
+    environment: projectdefined
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          clean: true
+
+      - name: Run SQLFluff with Reviewdog
+        id: sqlfluff
+        uses: alpt-all/alpt-sqllint@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_base_ref: ${{ github.base_ref }}
+          working-directory: ${{ github.workspace }}
+          JDBC: ${{ vars.JDBC }}
+
+      - name: Run Database Migration Action
+        if: env.should_continue == 'true' && steps.sqlfluff.outcome == 'success'
+        uses: alpt-all/alpt-flyway@v1
+        with:
+          JDBC: ${{ vars.JDBC }}
+          PASSWORD: ${{ secrets.PASSWORD }}
+          USERNAME: ${{ vars.USERNAME }}
+          DIALECT: postgresql
+          REPO_NAME: ${{ github.event.repository.name }}
+          FLYWAY_USER: ${{ secrets.FLYWAY_USER }} # It will work without, but instead of teams license it will use the community license
+          FLYWAY_PASSWORD: ${{ secrets.FLYWAY_PASSWORD }} # It will work without, but instead of teams license it will use the community license

@@ -1,0 +1,82 @@
+name: SQL-LINT
+
+on:
+  #pull_request:
+  workflow_dispatch:  
+
+jobs:
+  lint-check:
+    name: SQLFluff - LINT
+    runs-on: production
+    steps:
+      - name: Checkout this wonderfull project
+        uses: actions/checkout@v4
+      - name: Let's get sqlfluff in action 
+        uses: thierry-p-broucke-alpt/action-sqlfluff@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          reporter: github-pr-review
+          sqlfluff_version: "3.1.0"
+          sqlfluff_command: "lint"
+          config: '.sqlfluff'
+          paths: '${{ github.event.repository.name }}/${{ env.SQLLOCATION }}'
+          level: warning
+          dialect: ${{ env.DIALECT }}
+        env: 
+          DIALECT: ${{ vars.DIALECT }}
+          SQLLOCATION: ${{ vars.SQLLOCATION }}
+          USING_PODMAN: true
+          PODMAN_SOCKET: /run/podman/podman.sock
+
+      - name: Check if sqlfluff-lint.json exists
+        id: check_file
+        run: |
+          if test -f "sqlfluff-lint.json"; then
+            echo "file_exists=true" >> $GITHUB_ENV
+          else
+            echo "file_exists=false" >> $GITHUB_ENV
+          fi
+      - name: Agradecimentos
+        id: agradecimento
+        run: |
+          echo "Ola 🇵🇹, tenho noticias!" >> $GITHUB_STEP_SUMMARY
+      - name: Generate Report
+        if: env.file_exists == 'true'
+        run: |
+          echo ":warning: A action finalizou, porém, encontrei correções necessárias nos arquivos abaixo:" >> $GITHUB_STEP_SUMMARY
+          # Para versão 3.0.3 +
+          jq -r '.[] | .filepath as $filepath | .violations[] | "\($filepath) \(.start_line_no) \(.start_line_pos) \(.description)"' sqlfluff-lint.json | awk 'BEGIN {print "<table><tr><td>:gift: <b>Arquivo</td><td>:hammer: <b>Número da Linha</td><td>:bomb: <b>Posição</td><td>:page_facing_up: <b>Descrição</td></tr>"} {printf "<tr><td>%s</td><td>%s</td><td>%s</td><td>", $1, $2, $3; for (i=4; i<=NF; i++) printf "%s ", $i; print "</td></tr>"} END {print "</table>"}' >> $GITHUB_STEP_SUMMARY
+          echo "## Informação adicional" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ vars.DIALECT }}" = "mysql" ]; then 
+            echo "- Dialeto selecionado foi o 🐬 ${{ vars.DIALECT }} " >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ vars.DIALECT }}" = "postgresql" ]; then 
+            echo "- Dialeto selecionado foi o 🐘 ${{ vars.DIALECT }} " >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ vars.DIALECT }}" = "oracle" ]; then 
+            echo "- Dialeto selecionado foi o ⭕ ${{ vars.DIALECT }} " >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ vars.DIALECT }}" = "sqlserver" ]; then 
+            echo "- Dialeto selecionado foi o 🪟 ${{ vars.DIALECT }} " >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- Dialeto selecionado foi o ❓ ${{ vars.DIALECT }} " >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "- Diretório pesquisado : ${{ vars.SQLLOCATION }} " >> $GITHUB_STEP_SUMMARY
+
+
+      - name: Generate Report - When File Does Not Exist
+        if: env.file_exists == 'false'
+        run: |
+          echo ":information_source: Não foram encontrados correções necessárias." >> $GITHUB_STEP_SUMMARY
+          echo "## Informação adicional" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ vars.DIALECT }}" = "mysql" ]; then 
+            echo "- Dialeto selecionado foi o 🐬 ${{ vars.DIALECT }} " >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ vars.DIALECT }}" = "postgresql" ]; then 
+            echo "- Dialeto selecionado foi o 🐘 ${{ vars.DIALECT }} " >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ vars.DIALECT }}" = "oracle" ]; then 
+            echo "- Dialeto selecionado foi o ⭕ ${{ vars.DIALECT }} " >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ vars.DIALECT }}" = "sqlserver" ]; then 
+            echo "- Dialeto selecionado foi o 🪟 ${{ vars.DIALECT }} " >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- Dialeto selecionado foi o ❓ ${{ vars.DIALECT }} " >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "- Diretório pesquisado : ${{ vars.SQLLOCATION }} " >> $GITHUB_STEP_SUMMARY
+          

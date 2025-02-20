@@ -1,0 +1,806 @@
+# action.yml
+name: "Database Migration Action"
+description: "A GitHub Action to perform database migrations using Flyway."
+author: "thierry.p.broucke@altice.pt"
+
+inputs:
+  DATABASE:
+    description: "Database name"
+    required: false
+  JDBC:
+    description: "JDBC connection string"
+    required: true
+  PASSWORD:
+    description: "Database password"
+    required: true
+  USERNAME:
+    description: "Database username"
+    required: true
+  SCHEMAS:
+    description: "Database schemas"
+    required: false
+    default: ""
+  DIALECT:
+    description: "Database dialect (e.g., mysql, postgresql e etc)"
+    required: true
+  REPO_NAME:
+    description: "Repository name"
+    required: true
+  ROOT_PASSWORD:
+    description: "Root password for the database in the dummy environment"
+    required: false
+  FLYWAY_LOCATIONS:
+    description: "Location(s) where Flyway will search for migration files"
+    required: false
+    default: "migrations"
+  FLYWAY_USER:
+    description: "Flyway authentication username"
+    required: false
+  FLYWAY_PASSWORD:
+    description: "Flyway authentication password"
+    required: false
+  FLYWAY_CLI_INSTALL_CHECK:
+    description: "Define if should check for existing flyway or not"
+    required: false
+    default: "true"
+  FLYWAY_VERSION:
+    description: "Default flyway version 10.20.1"
+    required: false
+    default: "10.20.1"
+  FLYWAY_INSTALL_DIRECTORY:
+    description: "Where the cli should be installed, default is local dir then it will create a symbolic lynk to /usr/bin"
+    required: false
+    default: ""
+  OCI_TARGET_TDE_WALLET_ID:
+    description: "Target tde-wallet, needed on the process of creating / cloning PDBS"
+    required: false
+  OCI_TARGET_CID:
+    description: "Target Container OCID"
+    required: false
+  OCI_CLI_USER:
+    description: "User OCID used for the oci-cli api manipulation"
+    required: false
+  OCI_CLI_TENANCY:
+    description: "Tenancy OCID" 
+    required: false
+  OCI_CLI_REGION:
+    description: "Region"
+    required: false
+  OCI_CLI_FINGERPRINT:
+    description: "Fingerprint generated"
+    required: false
+  OCI_CLI_KEY_CONTENT:
+    description: "Api Key private key"
+    required: false  
+  OCI_PDB_ID:
+    description: "Source PDB ID"
+    required: false
+  OCI_SOURCE_QCARBON_KEY:
+    description: "Key from Source database"
+    required: false   
+
+
+  
+
+#outputs:
+#  DBVERSION:
+#    description: "The database version"
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Get Runner Workspace Directory
+      shell: bash
+      run: |
+        echo "The workspace directory is: $GITHUB_WORKSPACE"
+        echo "WORKSPACE_DIRECTORY=$GITHUB_WORKSPACE" >> $GITHUB_ENV
+        echo "Runner DIrectory : $WORKSPACE_DIRECTORY" >> "$GITHUB_STEP_SUMMARY"
+
+        
+    - name: Set Up Variables
+      id: set-vars
+      shell: bash
+      run: |
+        # Assign inputs to variables
+        echo "DATABASE=${{ inputs.DATABASE }}" >> $GITHUB_ENV
+        echo "JDBC=${{ inputs.JDBC }}" >> $GITHUB_ENV
+        echo "PASSWORD=${{ inputs.PASSWORD }}" >> $GITHUB_ENV
+        echo "USERNAME=${{ inputs.USERNAME }}" >> $GITHUB_ENV
+        echo "SCHEMAS=${{ inputs.SCHEMAS }}" >> $GITHUB_ENV
+        echo "DIALECT=${{ inputs.DIALECT }}" >> $GITHUB_ENV
+        echo "REPO_NAME=${{ inputs.REPO_NAME }}" >> $GITHUB_ENV
+        echo "ROOT_PASSWORD=${{ inputs.ROOT_PASSWORD }}" >> $GITHUB_ENV
+        echo "FLYWAY_LOCATIONS=${{ inputs.FLYWAY_LOCATIONS }}" >> $GITHUB_ENV
+        echo "FLYWAY_USER=${{ inputs.FLYWAY_USER }}" >> $GITHUB_ENV
+        echo "FLYWAY_PASSWORD=${{ inputs.FLYWAY_PASSWORD }}" >> $GITHUB_ENV
+        echo "GITHUB_STEP_SUMMARY=${GITHUB_STEP_SUMMARY}" >> $GITHUB_ENV
+        echo "GITHUB_WORKSPACE=${GITHUB_WORKSPACE}" >> $GITHUB_ENV
+    - name: Debug Variables
+      shell: bash
+      run: |
+        echo "DATABASE: $DATABASE"
+        echo "JDBC: $JDBC"
+        echo "PASSWORD: [REDACTED]"
+        echo "USERNAME: $USERNAME"
+        echo "SCHEMAS: $SCHEMAS"
+        echo "DIALECT: $DIALECT"
+        echo "REPO_NAME: $REPO_NAME"
+        echo "ROOT_PASSWORD: [REDACTED]"
+        echo "FLYWAY_LOCATIONS: $FLYWAY_LOCATIONS"
+        echo "FLYWAY_USER: $FLYWAY_USER"
+        echo "FLYWAY_PASSWORD: [REDACTED]"
+
+    - name: Check Required Secrets
+      shell: bash
+      run: |
+        check_secret() {
+          if [ -z "$1" ]; then
+            echo "The '$2' secret is not set. Please set it in your repository settings."
+            echo "😤 The variable '$2' is missing." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          else
+            echo "$2 Secret :green_circle: " >> "$GITHUB_STEP_SUMMARY"
+          fi
+        }
+        #check_secret "$DATABASE" "DATABASE"
+        check_secret "$JDBC" "JDBC"
+        check_secret "$PASSWORD" "PASSWORD"
+        check_secret "$USERNAME" "USERNAME"
+        check_secret "$DIALECT" "DIALECT"
+        check_secret "$REPO_NAME" "REPO_NAME"
+        #check_secret "$ROOT_PASSWORD" "ROOT_PASSWORD"
+        check_secret "$FLYWAY_LOCATIONS" "FLYWAY_LOCATIONS"
+        check_secret "$FLYWAY_USER" "FLYWAY_USER"
+        check_secret "$FLYWAY_PASSWORD" "FLYWAY_PASSWORD"
+    - name: Extract JDBC Values
+      shell: bash
+      run: |
+        #HOST=$(echo "$JDBC"  | sed 's/.*\/\/\([^:]*\).*/\1/')
+        #PORT=$(echo "$JDBC"  | sed 's/.*:\([^\/]*\).*/\1/') 
+        #DATABASE_NAME=$(echo "$JDBC" | sed 's/.*\/\([^\/]*\)/\1/')
+        
+        #echo "Connection: $JDBC" >> "$GITHUB_STEP_SUMMARY"
+        #echo "Host: $HOST" >> "$GITHUB_STEP_SUMMARY"
+        #echo "Port: $PORT" >> "$GITHUB_STEP_SUMMARY"
+        #echo "DB: $DATABASE_NAME" >> "$GITHUB_STEP_SUMMARY"
+        #echo "USERNAME: $USERNAME" >> "$GITHUB_STEP_SUMMARY"
+        #echo "HOST=$HOST" >> $GITHUB_ENV
+        #echo "PORT=$PORT" >> $GITHUB_ENV
+        #echo "DATABASE_NAME=$DATABASE_NAME" >> $GITHUB_ENV
+        #echo "REPO_NEWNAME="${REPO_NAME//-/_}"" >> $GITHUB_ENV
+
+        if [[ $JDBC == jdbc:postgres* ]]; then
+          DIALECT="postgres"
+          HOST=$(echo "$JDBC" | sed -E 's|.*://([^:]*):.*|\1|')
+          PORT=$(echo "$JDBC" | sed -E 's|.*:([0-9]+)/.*|\1|')
+          DATABASE_NAME=$(echo "$JDBC" | sed -E 's|.*/([^/]*)$|\1|')
+        elif [[ $JDBC == jdbc:oracle* ]]; then
+          DIALECT="oracle"
+          HOST=$(echo "$JDBC" | sed -E 's|.*//([^:]*):.*|\1|')
+          PORT=$(echo "$JDBC" | sed -E 's|.*:([0-9]+).*|\1|')
+          DATABASE_NAME=$(echo "$JDBC" | sed -E 's|.*/([^/]*)$|\1|')
+        elif [[ $JDBC == jdbc:mysql* ]]; then
+          DIALECT="mysql"
+          HOST=$(echo "$JDBC" | sed -E 's|.*://([^:]*):.*|\1|')
+          PORT=$(echo "$JDBC" | sed -E 's|.*:([0-9]+)/.*|\1|')
+          DATABASE_NAME=$(echo "$JDBC" | sed -E 's|.*/([^/]*)$|\1|')
+        else
+          echo "Unsupported JDBC URL format: $JDBC"
+          return 1
+        fi
+
+        echo "Connection: $JDBC" >> "$GITHUB_STEP_SUMMARY"
+        echo "Host: $HOST" >> "$GITHUB_STEP_SUMMARY"
+        echo "Port: $PORT" >> "$GITHUB_STEP_SUMMARY"
+        echo "DB: $DATABASE_NAME" >> "$GITHUB_STEP_SUMMARY"
+        echo "USERNAME: $USERNAME" >> "$GITHUB_STEP_SUMMARY"
+        echo "HOST=$HOST" >> $GITHUB_ENV
+        echo "PORT=$PORT" >> $GITHUB_ENV
+        echo "DATABASE_NAME=$DATABASE_NAME" >> $GITHUB_ENV
+        echo "REPO_NEWNAME="${REPO_NAME//-/_}"" >> $GITHUB_ENV
+
+        IPADDRESS=$(ping -c 1 $HOST | grep -oP '\(\K[^\)]+') 
+
+    #- name: Check if Flyway is installed
+    #  shell: bash
+    #  run: |
+    #    if type flyway > /dev/null 2>&1; then
+    #      echo "Flyway is presente, do nothing"
+    #    else
+    #      echo "Couldn't find Flyway, I'll install it now"
+    #      bash ${{ GITHUB.WORKSPACE }}/Scripts/Flyway_DownloadAndInstallCLI_Unix.sh
+    #    fi  
+
+    - name: Check if the Dialect is Oracle 
+      if: ${{ inputs.DIALECT == 'oracle' }} 
+      shell: bash
+      run: |
+        if type oci > /dev/null 2>&1; then
+          echo "oci is presente, do nothing"
+        else
+          echo "Couldn't find oci, I'll install it now"
+          bash ${{ GITHUB.WORKSPACE }}/Scripts/Oci-Install.sh --install-dir "$HOME/bin" --accept-all-defaults
+        fi        
+
+    - name: Connect to DockerHub and Oracle Registry Hub
+      shell: bash
+      run: |
+          # Replace onwards
+          echo "dckr_pat_SIspsNWfZMGecM1buQoTWRoWkfQ" | docker login docker.io -u "thierryvdbroucke" --password-stdin
+          echo "aCDdltTw4_P4Iy7Np=" | docker login container-registry.oracle.com -u "cloudyvdb@gmail.com" --password-stdin
+
+    - name: Check Database Connection
+      shell: bash
+      run: |
+        echo "✋- Check Database Connection" >> "$GITHUB_STEP_SUMMARY"
+        echo "Checking connection to Database $DATABASE" >> "$GITHUB_STEP_SUMMARY"
+        if [ "$DIALECT" = "mysql" ]; then
+          RESULT=$(mysql -h "$HOST" -P "$PORT" -u "$USERNAME" -p"$PASSWORD" "$DATABASE_NAME" -s --skip-column-names -e "SELECT 1;")
+          if [ "$RESULT" == "1" ]; then
+            echo "Connection Successful :green_circle: " >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Connection Failed :red_circle: " >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+        elif [ "$DIALECT" = "postgresql" ]; then
+          RESULT=$(PGPASSWORD="$PASSWORD" psql -h "$HOST" -p "$PORT" -U "$USERNAME" -d "$DATABASE_NAME" -c "SELECT 1;" -tA)
+          if [[ "$RESULT" == "1" ]]; then
+            echo "Connection Successful :green_circle: " >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Connection Failed :red_circle: " >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+        #Creating new Oracle Entry
+        elif [ "$DIALECT" = "oracle" ]; then
+          #echo "Connecting to Oracle Registry"
+          #DUALRESULT=$(docker run -i --rm --add-host="$HOST":"$IPADDRESS" ghcr.io/oracle/oraclelinux8-instantclient:21 sqlplus -S $USERNAME/$PASSWORD@$HOST:1521/$DATABASE_NAME <<EOF
+          #SELECT 1 FROM dual;
+          #EXIT;
+          #EOF
+          #)
+          #RESULT=$(echo "$DUALRESULT" | awk '/^ *1$/ {print $1}')
+          #if [[ "$RESULT" == "1" ]]; then
+          #  echo "Connection Successful :green_circle: " >> "$GITHUB_STEP_SUMMARY"
+          #else
+          #  echo "Connection Failed :red_circle: " >> "$GITHUB_STEP_SUMMARY"
+          #  exit 1
+          #fi 
+          echo "Passei"
+        else
+          echo "Unsupported dialect: $DIALECT" >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+        fi
+    - name: Get Database Version
+      shell: bash
+      run: |
+        echo "✋- Get Database Version" >> "$GITHUB_STEP_SUMMARY"
+        echo "Getting the database version" >> "$GITHUB_STEP_SUMMARY"
+        if [ "$DIALECT" = "mysql" ]; then
+          version=$(mysql -h "$HOST" -P "$PORT" -u "$USERNAME" -p"$PASSWORD" -D "$DATABASE_NAME" -s --skip-column-names -e "SELECT VERSION();")
+          echo "DBVERSION=$version" >> $GITHUB_OUTPUT
+          echo "DBVERSION=$version" >> $GITHUB_ENV
+          echo "🐬 $DIALECT Version: $version" >> "$GITHUB_STEP_SUMMARY"
+        elif [ "$DIALECT" = "postgresql" ]; then
+          version=$(PGPASSWORD="$PASSWORD" psql -h "$HOST" -p "$PORT" -U "$USERNAME" -d "$DATABASE_NAME" -c "SHOW server_version;" -tA)
+          echo "DBVERSION=$version" >> $GITHUB_OUTPUT
+          echo "DBVERSION=$version" >> $GITHUB_ENV
+          echo "🐘 $DIALECT Version: $version" >> "$GITHUB_STEP_SUMMARY"
+        elif [ "$DIALECT" = "oracle" ]; then
+          #oraversion=$(docker run -i --rm --add-host="$HOST":"$IPADDRESS" ghcr.io/oracle/oraclelinux8-instantclient:21 sqlplus -S $USERNAME/$PASSWORD@$HOST:1521/$DATABASE_NAME <<EOF
+          #SELECT banner FROM v\$version;
+          #EXIT;
+          #EOF
+          #)
+          #version=$(echo "$oraversion" | grep "Oracle Database" | awk '{print $3}')
+          #echo "DBVERSION=$version" >> $GITHUB_OUTPUT
+          #echo "DBVERSION=$version" >> $GITHUB_ENV
+          #echo "🐘 $DIALECT Version: $version" >> "$GITHUB_STEP_SUMMARY"
+          echo "DBVERSION=0" >> $GITHUB_ENV
+          echo "Passei"
+        fi
+    - name: Generate Database Backup
+      if: ${{ inputs.DIALECT != 'oracle' }} 
+      shell: bash
+      run: |
+        echo "✋- Generate Database Backup" >> "$GITHUB_STEP_SUMMARY"
+        echo "Generating a metadata backup" >> "$GITHUB_STEP_SUMMARY"
+        if [ "$DIALECT" = "mysql" ]; then
+          mysqldump -h "$HOST" -P "$PORT" -u "$USERNAME" -p"$PASSWORD" --no-data --databases "$DATABASE_NAME" --no-tablespaces > database.dmp
+          echo "Backup created: database.dmp" >> "$GITHUB_STEP_SUMMARY"
+          ls -al database.dmp >> "$GITHUB_STEP_SUMMARY"
+        elif [ "$DIALECT" = "postgresql" ]; then
+          PGPASSWORD="$PASSWORD" pg_dump -h "$HOST" -p "$PORT" -U "$USERNAME" --no-owner --no-acl --schema-only --dbname="$DATABASE_NAME" -F p -b -v -f database.dmp
+          echo "Backup created: database.dmp" >> "$GITHUB_STEP_SUMMARY"
+          ls -al database.dmp >> "$GITHUB_STEP_SUMMARY"
+        elif [ "$DIALECT" = "oracle" ]; then 
+          #TODO - DATA_PUMP_DIR in Oracle Must point to the WORK_DIR of the runner to be able to restore later on # 23/12/2024
+          # Script to create the DATA_PUMP_DIR directory , must already exist on all databases and user on secrets must have permission to use this dblink and FLYWAY_INSTALL_DIRECTORY:
+          # CREATE OR REPLACE DIRECTORY DATA_PUMP_DIR AS '< path to _work of the runner >';
+          # CREATE DATABASE LINK remote_db_link CONNECT TO <user> IDENTIFIED BY <password> USING '(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=ip or ns)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=<service name >)))';
+          #docker build -t oracle-client ./Oracle-Client
+          #docker run -it --rm --add-host="$HOST":"$IPADDRESS" oracle-client expdp $USERNAME/$PASSWORD@$HOST:1521/$DATABASE_NAME schemas=$USERNAME directory=DATA_PUMP_DIR dumpfile=backup.dmp logfile=backup.log network_link=REMOTE_DB_LINK content=all
+          #echo "Backup created: database.dmp" >> "$GITHUB_STEP_SUMMARY"
+          #ls -al database.dmp >> "$GITHUB_STEP_SUMMARY"
+          
+          #TODO - Add the oci command to create a clone of the PDB (Simply Jump to the next step)
+          echo "Backup not needed we are using oci to clone the pdb on the next step"
+        fi
+
+    - name: Create Dummy Database
+      env:
+        OCI_PDB_ID: ${{ inputs.OCI_PDB_ID }}
+        OCI_TARGET_CID: ${{ inputs.OCI_TARGET_CID }}
+        OCI_SOURCE_QCARBON_KEY: ${{ inputs.OCI_SOURCE_QCARBON_KEY }}
+        OCI_TARGET_TDE_WALLET_ID: ${{ inputs.OCI_TARGET_TDE_WALLET_ID }}
+        OCI_CLI_USER: ${{ inputs.OCI_CLI_USER }}
+        OCI_CLI_TENANCY: ${{ inputs.OCI_CLI_TENANCY }}
+        OCI_CLI_FINGERPRINT: ${{ inputs.OCI_CLI_FINGERPRINT }}
+        OCI_CLI_KEY_CONTENT: ${{ inputs.OCI_CLI_KEY_CONTENT }}
+        OCI_CLI_REGION: ${{ inputs.OCI_CLI_REGION }}
+        DBV: ${{ env.DBVERSION }}
+      shell: bash
+      run: |
+        echo "✋- Create Dummy Database" >> "$GITHUB_STEP_SUMMARY"
+        echo "Creating the dummy Database" >> "$GITHUB_STEP_SUMMARY"
+
+        # Stop and remove the container if it already exists
+        #if docker ps -a --format "{{.Names}}" | grep -q "^$REPO_NAME$"; then
+        #  echo "Stopping and removing existing container '$REPO_NAME'" >> "$GITHUB_STEP_SUMMARY"
+        #  docker stop "$REPO_NAME" && docker rm "$REPO_NAME"
+        #  # Wait for a few seconds to ensure the container is removed
+        #  sleep 5
+        #fi
+
+        # Read the local port range from /proc/sys/net/ipv4/ip_local_port_range
+        read lower_port upper_port < /proc/sys/net/ipv4/ip_local_port_range
+
+        # Function to check if a port is in use
+        is_port_in_use() {
+            local port=$1
+            if nc -z localhost $port; then
+                return 0  # Port is in use
+            else
+                return 1  # Port is not in use
+            fi
+        }
+
+        # Function to find a random unused port within the range
+        find_unused_port() {
+            local port
+            while true; do
+                # Get a random port number within the system's ephemeral port range
+                port=$(shuf -i $lower_port-$upper_port -n 1)
+                if ! is_port_in_use $port; then
+                    echo $port  # Return the port if it is not in use
+                    break
+                fi
+            done
+        }
+
+        # Find and print an unused random port
+        unused_port=$(find_unused_port)
+        echo "unused_port=$unused_port" >> $GITHUB_ENV
+        echo "✋- Using port: $unused_port" >> "$GITHUB_STEP_SUMMARY"
+
+
+        if [ "$DIALECT" = "mysql" ]; then
+          # Run the MySQL container using docker
+          # Stop and remove the container if it already exists
+          if docker ps -a --format "{{.Names}}" | grep -q "^$REPO_NAME$"; then
+            echo "Stopping and removing existing container '$REPO_NAME'" >> "$GITHUB_STEP_SUMMARY"
+            docker stop "$REPO_NAME" && docker rm "$REPO_NAME"
+            # Wait for a few seconds to ensure the container is removed
+            sleep 5
+          fi
+          docker run --name "$REPO_NAME" -e MYSQL_ALLOW_EMPTY_PASSWORD=yes -d -p $unused_port:3306 mysql:${DBV}
+          echo "MySQL container '$REPO_NAME' created successfully without root password." >> "$GITHUB_STEP_SUMMARY"
+          
+          # Wait for MySQL to initialize
+          until sudo docker exec "$REPO_NAME" mysqladmin ping --silent; do
+            echo "Waiting for MySQL to start..."
+            sleep 5
+          done
+        elif [ "$DIALECT" = "postgresql" ]; then
+          # Stop and remove the container if it already exists
+          if docker ps -a --format "{{.Names}}" | grep -q "^$REPO_NAME$"; then
+            echo "Stopping and removing existing container '$REPO_NAME'" >> "$GITHUB_STEP_SUMMARY"
+            docker stop "$REPO_NAME" && docker rm "$REPO_NAME"
+            # Wait for a few seconds to ensure the container is removed
+            sleep 5
+          fi
+          echo "Creating pg_hba and init.sql file"
+          echo "host all all all trust" >> pg_hba.conf
+          echo "ALTER USER admin WITH PASSWORD NULL;" > init.sql
+          echo "Set custom_pgdata permissions"
+          mkdir -p custom_pgdata
+          sudo chmod -R 777 custom_pgdata
+          sudo chown ghrunner.ghrunner custom_pgdata init.sql pg_hba.conf
+
+          echo "Generate random password for postgres"
+          # Generate a random 8-character password
+          POSTGRES_PASSWORD=$(openssl rand -base64 8 | tr -dc 'A-Za-z0-9' | head -c 8) 
+          echo "POSTGRES_PASSWORD=$POSTGRES_PASSWORD" >> $GITHUB_ENV
+          # Output the generated password to the GitHub Step Summary
+          echo "Dummy - PostgreSql user '$USERNAME' created with password: $POSTGRES_PASSWORD" >> "$GITHUB_STEP_SUMMARY"
+
+          # Run the PostgreSQL container using docker
+
+          docker run --name "$REPO_NAME" -e POSTGRES_USER="admin"  -e POSTGRES_PASSWORD=$POSTGRES_PASSWORD -d -p $unused_port:5432 postgres:12
+
+          echo "PostgreSQL container '$REPO_NAME' created successfully with admin password." >> "$GITHUB_STEP_SUMMARY"
+
+          # Wait for PostgreSQL to initialize
+          until PGPASSWORD=$POSTGRES_PASSWORD docker exec "$REPO_NAME" pg_isready -U admin; do
+            echo "Waiting for PostgreSQL to start..."
+            sleep 2
+          done
+          
+          echo "Create the pg_hba.conf file"
+          docker exec "$REPO_NAME" bash -c "echo 'host all all all trust' >> /var/lib/postgresql/data/pg_hba.conf"
+
+          echo "Low permission restart on container"
+          docker restart "$REPO_NAME"
+          
+          # Wait for PostgreSQL to initialize
+          until PGPASSWORD=$POSTGRES_PASSWORD docker exec "$REPO_NAME" pg_isready -U admin; do
+            echo "Waiting for PostgreSQL to start..."
+            sleep 2
+          done
+
+          # Create the database
+          PGPASSWORD=$POSTGRES_PASSWORD docker exec "$REPO_NAME" psql -U admin -c "CREATE DATABASE \"$REPO_NEWNAME\";"
+          echo "Database '$REPO_NEWNAME' created in PostgreSQL container." >> "$GITHUB_STEP_SUMMARY"
+        elif [ "$DIALECT" = "oracle" ]; then 
+          #ORACLE_PASSWORD=$(openssl rand -base64 23 | tr -dc 'A-Za-z0-9' | head -c 23) 
+          generate_password() {
+            
+            local base=$(cat /dev/urandom | tr -dc 'A-Za-z0-9' | fold -w 23 | head -n 1)
+
+            # Select two distinct positions (2-11) for '-' and '_'
+            local pos1=$((RANDOM % 9 + 2))  # Random position between 2 and 10
+            local pos2=$((RANDOM % 9 + 2))
+
+            while [ "$pos1" -eq "$pos2" ]; do
+                pos2=$((RANDOM % 9 + 2))  # Ensure positions are different
+            done
+
+            # Insert '-' and '_'
+            local password="${base:0:$pos1}-${base:$pos1}"
+            password="${password:0:$pos2}_${password:$pos2}"
+
+            echo "$password"
+          }
+          
+          ORACLE_PASSWORD=$(generate_password)
+          echo "ORACLE_PASSWORD=$ORACLE_PASSWORD" >> $GITHUB_ENV
+
+          echo "Debug Password : $ORACLE_PASSWORD"   
+
+          PDB_RESPONSE=$(oci db pluggable-database remote-clone --pluggable-database-id "$OCI_PDB_ID" --target-container-database-id "$OCI_TARGET_CID" --cloned-pdb-name "P$REPO_NEWNAME" --pdb-admin-password $ORACLE_PASSWORD --source-container-db-admin-password "$OCI_SOURCE_QCARBON_KEY" --target-tde-wallet-password "$OCI_TARGET_TDE_WALLET_ID")
+          PDB_OCID=$(echo "$PDB_RESPONSE" | jq -r '.data.id')
+
+          if [[ -z "$PDB_OCID" || "$PDB_OCID" == "null" ]]; then
+              echo "❌ Failed to create the Pluggable Database."
+              exit 1
+          fi
+
+          echo "📌 PDB OCID: $PDB_OCID"
+          echo "⏳ Waiting for PDB to become AVAILABLE..."
+
+          # Step 3: Wait for PDB to be in 'AVAILABLE' state
+          while true; do
+              PDB_STATUS=$(oci db pluggable-database get --pluggable-database-id "$PDB_OCID" | jq -r '.data.lifecycle-state')
+
+              if [[ "$PDB_STATUS" == "AVAILABLE" ]]; then
+                  echo "✅ PDB is now AVAILABLE!"
+                  break
+              elif [[ "$PDB_STATUS" == "FAILED" ]]; then
+                  echo "❌ PDB provisioning failed!"
+                  exit 1
+              fi
+
+              echo "⏳ Status: $PDB_STATUS... checking again in 60 seconds."
+              sleep 60
+          done
+
+          # Step 4: Retrieve Connection Strings
+          echo "🔍 Fetching Connection Strings..."
+          CONNECTION_STRINGS=$(oci db pluggable-database get --pluggable-database-id "$PDB_OCID" --query "data.connection-strings" --raw-output)
+
+          if [[ -z "$CONNECTION_STRINGS" || "$CONNECTION_STRINGS" == "null" ]]; then
+              echo "⚠️ Connection strings are not available yet. Please check again later."
+          else
+              echo "🔗 PDB Connection String:"
+              echo "$CONNECTION_STRINGS"
+          fi
+        else
+          echo "Unsupported dialect for creating dummy database: $DIALECT" >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+        fi
+
+
+
+    - name: Restore Database to Dummy Environment
+      if: ${{ inputs.DIALECT != 'oracle' }} 
+      shell: bash
+      env:
+        DUMMY_PORT: ${{ env.unused_port }}
+        PGDUMMY_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+      run: |
+        echo "✋- Restore Database to Dummy Environment" >> "$GITHUB_STEP_SUMMARY"
+        echo "Restoring to the database version" >> "$GITHUB_STEP_SUMMARY"
+        if [ "$DIALECT" = "mysql" ]; then
+          echo "Alter internal Database name to $REPO_NEWNAME"
+          sed -i "s/CREATE DATABASE.*\`[a-zA-Z0-9_]*\`/CREATE DATABASE \`$REPO_NEWNAME\`/g" database.dmp
+          sed -i "s/USE \`[a-zA-Z0-9_]*\`/USE \`$REPO_NEWNAME\`/g" database.dmp
+          echo "Validate change"
+          grep -E "CREATE DATABASE|USE" database.dmp
+          echo "Copy Backup to Container"
+          docker cp database.dmp "$REPO_NAME":/tmp/database.dmp
+          echo "Check if backup has been copied"
+          docker exec "$REPO_NAME" ls /tmp/database.dmp || { echo "Backup file not found in container" >> "$GITHUB_STEP_SUMMARY"; exit 1; }
+          echo "Restoring database"
+          docker exec "$REPO_NAME" mysql -uroot -e "source /tmp/database.dmp;"
+          echo "Database restored successfully" >> "$GITHUB_STEP_SUMMARY"
+          echo "Show tables"
+          docker exec "$REPO_NAME" mysql -uroot -e "SHOW TABLES IN $REPO_NEWNAME;"
+
+          #TODO Create a conditional here, baseline should be done only when no schema_history is present
+          # Create Flyway baseline
+          #flyway -user="$USERNAME" -password="$PASSWORD" -url="jdbc:mysql://$HOST:$DUMMY_PORT/$REPO_NEWNAME" -baselineOnMigrate=true -locations="filesystem:$FLYWAY_LOCATIONS" baseline
+          #echo "Flyway baseline created for MySQL" >> "$GITHUB_STEP_SUMMARY"
+
+          # Generate a random 8-character password
+          MYSQL_USER_PASSWORD=$(openssl rand -base64 8 | tr -dc 'A-Za-z0-9' | head -c 8) 
+          echo "MYSQL_USER_PASSWORD=$MYSQL_USER_PASSWORD" >> $GITHUB_ENV
+
+          # Create MySQL user with the specified username and random password
+          echo "Creating user '$USERNAME' with admin permissions"
+          docker exec "$REPO_NAME" mysql -uroot -e "CREATE USER '$USERNAME'@'%' IDENTIFIED BY '$MYSQL_USER_PASSWORD';"
+          docker exec "$REPO_NAME" mysql -uroot -e "GRANT ALL PRIVILEGES ON \`$REPO_NEWNAME\`.* TO '$USERNAME'@'%';"
+          docker exec "$REPO_NAME" mysql -uroot -e "FLUSH PRIVILEGES;"
+
+          # Output the generated password to the GitHub Step Summary
+          echo "Dummy - MySQL user '$USERNAME' created with password: $MYSQL_USER_PASSWORD" >> "$GITHUB_STEP_SUMMARY"
+
+        elif [ "$DIALECT" = "postgresql" ]; then
+          echo "Copy database to container"
+          docker cp database.dmp "$REPO_NAME":/tmp/database.dmp
+
+          echo "Creating user '$USERNAME' with admin permissions for PostgreSQL"
+
+          # Create the user and set their password
+          PGPASSWORD=$PGDUMMY_PASSWORD docker exec "$REPO_NAME" psql -U admin -c "CREATE USER $USERNAME WITH PASSWORD '$PGDUMMY_PASSWORD';"
+
+          # Grant all privileges on the database to the user
+          PGPASSWORD=$PGDUMMY_PASSWORD docker exec "$REPO_NAME" psql -U admin -c "GRANT ALL PRIVILEGES ON DATABASE \"$REPO_NEWNAME\" TO $USERNAME;"
+
+          # Optionally, make the user a superuser if you want admin privileges
+          PGPASSWORD=$PGDUMMY_PASSWORD docker exec "$REPO_NAME" psql -U admin -d postgres -c "ALTER USER $USERNAME WITH SUPERUSER;"
+
+          docker exec "$REPO_NAME" sh -c "PGPASSWORD=$PGDUMMY_PASSWORD psql -h \"$HOST\" -p \"$DUMMY_PORT\" -U \"admin\" -d \"$REPO_NEWNAME\" -f /tmp/database.dmp"
+
+          echo "Database restored successfully" >> "$GITHUB_STEP_SUMMARY"
+
+          #TODO Create a conditional here, baseline should be done only when no schema_history is present
+          # Create Flyway baseline
+          #flyway -user="$USERNAME" -password="$PGDUMMY_PASSWORD" -url="jdbc:postgresql://$HOST:$DUMMY_PORT/$REPO_NEWNAME" -baselineOnMigrate=true -locations="filesystem:$FLYWAY_LOCATIONS" baseline
+          #echo "Flyway baseline created for PostgreSQL" >> "$GITHUB_STEP_SUMMARY"
+
+        elif [ "$DIALECT" = "oracle" ]; then 
+          #TODO - DATA_PUMP_DIR in Oracle Must point to the WORK_DIR of the runner to be able to restore later on # 23/12/2024
+          # Script to create the DATA_PUMP_DIR directory , must already exist on all databases and user on secrets must have permission to use this dblink and FLYWAY_INSTALL_DIRECTORY:
+          # CREATE OR REPLACE DIRECTORY DATA_PUMP_DIR AS '< path to _work of the runner >';
+          # CREATE DATABASE LINK remote_db_link CONNECT TO <user> IDENTIFIED BY <password> USING '(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=ip or ns)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=<service name >)))';
+          #docker build -t oracle-client ./Oracle-Client
+          # TODO Ajustar conexão com o ephemeral DB
+          #docker run -it --rm --add-host="$HOST":"$IPADDRESS" oracle-client impdp $USERNAME/$PASSWORD@$HOST:$UNUSED_PORT/$DATABASE_NAME schemas=$USERNAME directory=DATA_PUMP_DIR dumpfile=backup.dmp logfile=backup.log network_link=REMOTE_DB_LINK content=all
+          #echo "Backup created: database.dmp" >> "$GITHUB_STEP_SUMMARY"
+          #ls -al database.dmp >> "$GITHUB_STEP_SUMMARY"
+
+          #Step not needed
+          echo "Restore not needed we are using oci to clone the pdb"
+        fi
+
+    - name: Run Flyway Info On Dummy
+      if: ${{ env.DIALECT != 'oracle' }}
+      shell: bash
+      env:
+        DUMMY_USER: ${{ env.USERNAME }}
+        DUMMY_PASSWORD: ${{ env.MYSQL_USER_PASSWORD }}
+        DUMMY_PORT: ${{ env.unused_port }}
+        PGDUMMY_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+        ORADUMMY_PASSWORD: ${{ env.ORACLE_PASSWORD }}
+      run: |
+        echo "✋- Run Flyway Clean Info" >> "$GITHUB_STEP_SUMMARY"
+        echo "Running Flyway Clean Info with dummy user on port $DUMMY_PORT" >> "$GITHUB_STEP_SUMMARY"
+        echo "Check variables : "
+        echo "DUMMY_USER: $DUMMY_USER"
+        echo "DUMMY_PASSWORD: $DUMMY_PASSWORD"
+        echo "DUMMY_PORT: $DUMMY_PORT"
+        echo "REPO_NEWNAME: $REPO_NEWNAME"
+        echo "FLYWAY_LOCATIONS: $FLYWAY_LOCATIONS"
+
+        #Remove, user license should be used
+        flyway auth -IAgreeToTheEula -logout
+
+        # Temporary file to store Flyway output
+        FLYWAY_OUTPUT_FILE=$(mktemp)
+        if [ "$DIALECT" = "mysql" ]; then
+        # Authenticate and run Flyway info using dummy user credentials and the specified port
+          flyway info clean info -user="$DUMMY_USER" -password="$DUMMY_PASSWORD" -baselineOnMigrate="true" -locations="filesystem:$FLYWAY_LOCATIONS" info -url="jdbc:$DIALECT://$HOST:$DUMMY_PORT/$REPO_NEWNAME?useSSL=false&allowPublicKeyRetrieval=true" -cleanDisabled=false | tee "$FLYWAY_OUTPUT_FILE"
+        elif [ "$DIALECT" = "postgresql" ]; then
+          flyway info clean info -user="$DUMMY_USER" -password="$PGDUMMY_PASSWORD" -baselineOnMigrate="true" -locations="filesystem:$FLYWAY_LOCATIONS" info -url="jdbc:$DIALECT://$HOST:$DUMMY_PORT/$REPO_NEWNAME" -cleanDisabled=false | tee "$FLYWAY_OUTPUT_FILE"
+        elif [ "$DIALECT" = "oracle" ]; then
+          flyway info clean info -user="$DUMMY_USER" -password="$PGDUMMY_PASSWORD" -baselineOnMigrate="true" -locations="filesystem:$FLYWAY_LOCATIONS" info -url="jdbc:$DIALECT://$HOST:$DUMMY_PORT/$REPO_NEWNAME" -cleanDisabled=false | tee "$FLYWAY_OUTPUT_FILE"
+        fi
+        echo ":rocket:" >> "$GITHUB_STEP_SUMMARY"
+        
+    - name: Run Flyway migrate on Dummy
+      if: ${{ env.DIALECT != 'oracle' }}
+      shell: bash
+      env:
+        DUMMY_USER: ${{ env.USERNAME }}
+        DUMMY_PASSWORD: ${{ env.MYSQL_USER_PASSWORD }}
+        PGDUMMY_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+        DUMMY_PORT: ${{ env.unused_port }}
+        ORADUMMY_PASSWORD: ${{ env.ORACLE_PASSWORD }}
+      run: |
+        echo "✋- Run Flyway Migrations" >> "$GITHUB_STEP_SUMMARY"
+        echo "Running Flyway migrations" >> "$GITHUB_STEP_SUMMARY"
+        FLYWAY_OUTPUT_FILE=$(mktemp)
+        if [ "$DIALECT" = "mysql" ]; then
+          flyway info migrate info -user="$DUMMY_USER" -password="$DUMMY_PASSWORD" -baselineOnMigrate="true" -locations="filesystem:$FLYWAY_LOCATIONS" -url="jdbc:$DIALECT://$HOST:$DUMMY_PORT/$REPO_NEWNAME?useSSL=false&allowPublicKeyRetrieval=true" | tee "$FLYWAY_OUTPUT_FILE"
+        elif [ "$DIALECT" = "postgresql" ]; then
+          flyway info migrate info -user="$DUMMY_USER" -password="$PGDUMMY_PASSWORD" -baselineOnMigrate="true" -locations="filesystem:$FLYWAY_LOCATIONS" -url="jdbc:$DIALECT://$HOST:$DUMMY_PORT/$REPO_NEWNAME" | tee "$FLYWAY_OUTPUT_FILE"
+        elif [ "$DIALECT" = "oracle" ]; then
+          # Preciso pegar a informação da porta via connection string durante a etapa de criação do PDB ( CLONE )
+          # Dummy user é sys, system, admin ou ???
+          flyway info migrate info -user="$DUMMY_USER" -password="$PGDUMMY_PASSWORD" -baselineOnMigrate="true" -locations="filesystem:$FLYWAY_LOCATIONS" -url="jdbc:$DIALECT://$HOST:$DUMMY_PORT/$REPO_NEWNAME" | tee "$FLYWAY_OUTPUT_FILE"
+        fi
+        echo ":rocket:" >> "$GITHUB_STEP_SUMMARY"
+     
+     
+    - name: Run Flyway Info on QA
+      #if: github.event.pull_request.merged == true
+      if: ${{ env.DIALECT != 'oracle' }}
+      shell: bash
+      run: |
+        if [ "$DIALECT" = "mysql" ]; then
+          flyway -user="$USERNAME" -password="$PASSWORD" -url="$JDBC?useSSL=false&allowPublicKeyRetrieval=true" -locations="filesystem:$FLYWAY_LOCATIONS" info
+          flyway -user="$USERNAME" -password="$PASSWORD" -url="$JDBC?useSSL=false&allowPublicKeyRetrieval=true" -locations="filesystem:$FLYWAY_LOCATIONS" repair
+        elif [ "$DIALECT" = "postgresql" ]; then
+          flyway -user="$USERNAME" -password="$PASSWORD" -url="$JDBC" -locations="filesystem:$FLYWAY_LOCATIONS" info
+          flyway -user="$USERNAME" -password="$PASSWORD" -url="$JDBC" -locations="filesystem:$FLYWAY_LOCATIONS" repair
+        elif [ "$DIALECT" = "oracle" ]; then
+          flyway -user="$USERNAME" -password="$PASSWORD" -url="$JDBC" -locations="filesystem:$FLYWAY_LOCATIONS" info
+          flyway -user="$USERNAME" -password="$PASSWORD" -url="$JDBC" -locations="filesystem:$FLYWAY_LOCATIONS" repair
+        fi
+      continue-on-error: true    
+
+    - name: Run Migration on QA
+      #if: github.event.pull_request.merged == true
+      if: ${{ env.DIALECT != 'oracle' }}
+      shell: bash
+      run: |
+        FLYWAY_OUTPUT_FILE=$(mktemp)
+        if [ "$DIALECT" = "mysql" ]; then
+          echo "Doing the actual migrate"
+          flyway info migrate info -user="$USERNAME" -password="$PASSWORD" -baselineOnMigrate="true" -locations="filesystem:$FLYWAY_LOCATIONS" -url="$JDBC?useSSL=false&allowPublicKeyRetrieval=true" | tee "$FLYWAY_OUTPUT_FILE"
+        elif [ "$DIALECT" = "postgresql" ]; then
+          echo "Doing the actual migrate"
+          flyway info migrate info -user="$USERNAME" -password="$PASSWORD" -baselineOnMigrate="true" -locations="filesystem:$FLYWAY_LOCATIONS" -url="$JDBC" | tee "$FLYWAY_OUTPUT_FILE"  
+        fi
+
+        RESULT=$(cat "$FLYWAY_OUTPUT_FILE" | sed '/+-----------+-------------+-------------+------+---------------------+---------+----------+/d' | grep "Schema version" -A9999 | tail -n +3 )
+        
+        # Generate HTML table and skip rows without meaningful data
+        html_table=$(echo "$RESULT" | awk 'BEGIN {
+          FS="|";
+          print "<table>";
+          print "<tr><th>Category</th><th>Version</th><th>Description</th><th>Type</th><th>Installed On</th><th>State</th><th>Undoable</th></tr>"
+        }
+        NR > 2 && NF {
+          # Trim spaces from each column
+          gsub(/^ +| +$/,"",$2);
+          gsub(/^ +| +$/,"",$3);
+          gsub(/^ +| +$/,"",$4);
+          gsub(/^ +| +$/,"",$5);
+          gsub(/^ +| +$/,"",$6);
+          gsub(/^ +| +$/,"",$7);
+          gsub(/^ +| +$/,"",$8);
+
+          state = $7;
+          # Only add emoji if the state is "Success"
+          if (state == "Success") {
+            state = state " :green_circle: ";
+          } else if (state == "Pending") {
+            state = state " :red_circle: ";
+          } else {
+            state = "";  # Avoid emoji if no state info
+          }
+
+          # Print row only if it has meaningful data
+          if ($2 != "" || $3 != "" || $4 != "" || $5 != "" || $6 != "" || $7 != "" || $8 != "") {
+            print "<tr><td>"$2"</td><td>"$3"</td><td>"$4"</td><td>"$5"</td><td>"$6"</td><td>"state"</td><td>"$8"</td></tr>";
+          }
+        }
+        END {
+          print "</table>"
+        }')
+
+        echo "$html_table" >> "$GITHUB_STEP_SUMMARY"   
+
+    - name: Run Flyway Info on Production
+      if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main' && ${{ env.DIALECT != 'oracle' }}
+      shell: bash
+      run: |
+        if [ "$DIALECT" = "mysql" ]; then
+          flyway -user="$USERNAME" -password="$PASSWORD" -url="$JDBC?useSSL=false&allowPublicKeyRetrieval=true" -locations="filesystem:$FLYWAY_LOCATIONS" info
+          flyway -user="$USERNAME" -password="$PASSWORD" -url="$JDBC?useSSL=false&allowPublicKeyRetrieval=true" -locations="filesystem:$FLYWAY_LOCATIONS" repair
+        elif [ "$DIALECT" = "postgresql" ]; then
+          flyway -user="$USERNAME" -password="$PASSWORD" -url="$JDBC" -locations="filesystem:$FLYWAY_LOCATIONS" info
+          flyway -user="$USERNAME" -password="$PASSWORD" -url="$JDBC" -locations="filesystem:$FLYWAY_LOCATIONS" repair
+        elif [ "$DIALECT" = "oracle" ]; then
+          flyway -user="$USERNAME" -password="$PASSWORD" -url="$JDBC" -locations="filesystem:$FLYWAY_LOCATIONS" info
+          flyway -user="$USERNAME" -password="$PASSWORD" -url="$JDBC" -locations="filesystem:$FLYWAY_LOCATIONS" repair
+        fi
+      continue-on-error: true    
+
+    - name: Run Migration on Production
+      if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main' && ${{ env.DIALECT != 'oracle' }}
+      shell: bash
+      run: |
+        FLYWAY_OUTPUT_FILE=$(mktemp)
+        if [ "$DIALECT" = "mysql" ]; then
+          echo "Doing the actual migrate"
+          flyway info migrate info -user="$USERNAME" -password="$PASSWORD" -baselineOnMigrate="true" -locations="filesystem:$FLYWAY_LOCATIONS" -url="$JDBC?useSSL=false&allowPublicKeyRetrieval=true" | tee "$FLYWAY_OUTPUT_FILE"
+        elif [ "$DIALECT" = "postgresql" ]; then
+          echo "Doing the actual migrate"
+          flyway info migrate info -user="$USERNAME" -password="$PASSWORD" -baselineOnMigrate="true" -locations="filesystem:$FLYWAY_LOCATIONS" -url="$JDBC" | tee "$FLYWAY_OUTPUT_FILE"  
+        fi
+
+        RESULT=$(cat "$FLYWAY_OUTPUT_FILE" | sed '/+-----------+-------------+-------------+------+---------------------+---------+----------+/d' | grep "Schema version" -A9999 | tail -n +3 )
+        
+        # Generate HTML table and skip rows without meaningful data
+        html_table=$(echo "$RESULT" | awk 'BEGIN {
+          FS="|";
+          print "<table>";
+          print "<tr><th>Category</th><th>Version</th><th>Description</th><th>Type</th><th>Installed On</th><th>State</th><th>Undoable</th></tr>"
+        }
+        NR > 2 && NF {
+          # Trim spaces from each column
+          gsub(/^ +| +$/,"",$2);
+          gsub(/^ +| +$/,"",$3);
+          gsub(/^ +| +$/,"",$4);
+          gsub(/^ +| +$/,"",$5);
+          gsub(/^ +| +$/,"",$6);
+          gsub(/^ +| +$/,"",$7);
+          gsub(/^ +| +$/,"",$8);
+
+          state = $7;
+          # Only add emoji if the state is "Success"
+          if (state == "Success") {
+            state = state " :green_circle: ";
+          } else if (state == "Pending") {
+            state = state " :red_circle: ";
+          } else {
+            state = "";  # Avoid emoji if no state info
+          }
+
+          # Print row only if it has meaningful data
+          if ($2 != "" || $3 != "" || $4 != "" || $5 != "" || $6 != "" || $7 != "" || $8 != "") {
+            print "<tr><td>"$2"</td><td>"$3"</td><td>"$4"</td><td>"$5"</td><td>"$6"</td><td>"state"</td><td>"$8"</td></tr>";
+          }
+        }
+        END {
+          print "</table>"
+        }')
+
+        echo "$html_table" >> "$GITHUB_STEP_SUMMARY"   
+
+    - name: Finish
+      if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main' && ${{ env.DIALECT != 'oracle' }}
+      shell: bash
+      run: |
+        echo "Finish" >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,2 @@
+Flyway : https://download.red-gate.com/checkforupdates/FlywayDesktopLinuxX64.tar.gz
+ - Dockefile will use a fixed flyway.zip file located on /opt/flyway.zip for testing.

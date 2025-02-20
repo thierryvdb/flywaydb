@@ -1,0 +1,445 @@
+name: Flyway Migrations
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  ACTIONS_RUNNER_DEBUG: true
+  pauseForCodeReview: true
+
+jobs:
+  chkvariables:
+    name: Checking variables
+    runs-on: production
+    environment: production
+    steps:
+      - name: Ajuda com variaveis de ambiente?
+        run: |
+          echo "Caso tenha uma dificuldade, acesse o link abaixo: " >> $GITHUB_STEP_SUMMARY
+          echo "https://alticeportugal.atlassian.net/wiki/spaces/TEAMBDORAC/pages/545914978" >> $GITHUB_STEP_SUMMARY
+          echo " "
+
+      - name: Check Database Name
+        run: |
+          if [ -z "${{ secrets.DATABASE }}" ]; then
+            echo "The 'DATABASE' secret is not set. Please set it in your repository settings."
+            echo "😤 Faltou a atribuição desta variavel : " >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo "Database Secret :green_circle: " >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Check JDBC Connection String
+        run: |
+          if [ -z "${{ secrets.JDBC }}" ]; then
+            echo "The 'JDBC' secret is not set. Please set it in your repository settings."
+            echo "😤 Faltou a atribuição desta variavel : " >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo "JDBC Secret :green_circle: " >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Check Password
+        run: |
+          if [ -z "${{ secrets.PASSWORD }}" ]; then
+            echo "The 'PASSWORD' secret is not set. Please set it in your repository settings."
+            echo "😤 Faltou a atribuição desta variavel : " >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo "Password Secret :green_circle: " >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Check Username
+        run: |
+          if [ -z "${{ secrets.USERNAME }}" ]; then
+            echo "The 'USERNAME' secret is not set. Please set it in your repository settings."
+            echo "😤 Faltou a atribuição desta variavel : " >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo "Username Secret :green_circle: " >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Check Schemas
+        run: |
+          if [ -z "${{ secrets.SCHEMAS }}" ]; then
+            echo "The 'SCHEMAS' secret is not set. Please set it in your repository settings."
+            echo "😤 Faltou a atribuição desta variavel : " >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo "Schemas Secret :green_circle: " >> $GITHUB_STEP_SUMMARY
+          fi
+
+  dbconnect:
+    name: Check Production Database Connection
+    needs: [chkvariables]
+    runs-on: production
+    environment: production
+    steps:
+      - name: Connect to Database
+        id: dbconnect
+        run: |
+          if [ "${{ vars.DIALECT }}" = "mysql" ]; then
+            PROTOCOL=$(echo "${{ secrets.JDBC }}" | sed 's/\(.*\):\(.*\)/\1/')
+            echo "Connection: $PROTOCOL" >> $GITHUB_STEP_SUMMARY
+            HOST=$(echo "${{ secrets.JDBC }}" | sed 's/.*\/\/\([^:]*\).*/\1/')
+            echo "Host: $HOST" >> $GITHUB_STEP_SUMMARY
+            PORT=$(echo "${{ secrets.JDBC }}" | sed 's/.*:\([^\/]*\).*/\1/')
+            echo "Port: $PORT" >> $GITHUB_STEP_SUMMARY
+            DATABASE=$(echo "${{ secrets.JDBC }}" | sed 's/.*\/\([^\/]*\)/\1/')
+            echo "Database: $DATABASE" >> $GITHUB_STEP_SUMMARY
+            RESULT=$(mysql -h $HOST -u ${{ secrets.USERNAME }} -p${{ secrets.PASSWORD }} ${{ secrets.DATABASE }} -s --skip-column-names -e "SELECT 1;")
+            if [ "$RESULT" == "1" ]; then
+              echo "Connection Successful :green_circle: " >> $GITHUB_STEP_SUMMARY
+            else
+              echo "Connection Failed :red_circle: " >> $GITHUB_STEP_SUMMARY
+              exit 1
+            fi
+          elif [ "${{ vars.DIALECT }}" = "postgresql" ]; then
+            PROTOCOL=$(echo "${{ secrets.JDBC }}" | sed 's/\(.*\):\(.*\)/\1/')
+            echo "Connection: $PROTOCOL" >> $GITHUB_STEP_SUMMARY
+            HOST=$(echo "${{ secrets.JDBC }}" | sed 's/.*\/\/\([^:]*\).*/\1/')
+            echo "Host: $HOST" >> $GITHUB_STEP_SUMMARY
+            PORT=$(echo "${{ secrets.JDBC }}" | sed 's/.*:\([^\/]*\).*/\1/')
+            echo "Port: $PORT" >> $GITHUB_STEP_SUMMARY
+            DATABASE=$(echo "${{ secrets.JDBC }}" | sed 's/.*\/\([^\/]*\)/\1/')
+            echo "Database: $DATABASE" >> $GITHUB_STEP_SUMMARY
+            RESULT=$(PGPASSWORD=${{ secrets.PASSWORD }} psql -h $HOST -U ${{ secrets.USERNAME }} -d ${{ secrets.DATABASE }} -c "SELECT 1;")
+            if [[ "$RESULT" == *"1"* ]]; then
+              echo "Connection Successful :green_circle: " >> $GITHUB_STEP_SUMMARY
+            else
+              echo "Connection Failed :red_circle: " >> $GITHUB_STEP_SUMMARY
+              exit 1
+            fi
+          elif [ "${{ vars.DIALECT }}" = "oracle" ]; then
+            echo "- Dialeto selecionado foi o ⭕ ${{ vars.DIALECT }} "
+          elif [ "${{ vars.DIALECT }}" = "sqlserver" ]; then
+            echo "- Dialeto selecionado foi o 🪟 ${{ vars.DIALECT }} "
+          else
+            echo "- Dialeto selecionado foi o ❓ ${{ vars.DIALECT }} "
+          fi
+
+  dbversion:
+    name: Getting Database Version
+    needs: [chkvariables]
+    runs-on: production
+    outputs:
+      DBVERSION: ${{ steps.dbversion.outputs.DBVERSION }}
+    environment: production
+    steps:
+      - name: Get Database Version
+        id: dbversion
+        run: |
+          if [ "${{ vars.DIALECT }}" = "mysql" ]; then
+            echo "- Dialeto selecionado foi o 🐬 ${{ vars.DIALECT }} "
+            version=$(mysql -u ${{ secrets.USERNAME }} -p${{ secrets.PASSWORD }} -D ${{ secrets.DATABASE }} -s --skip-column-names -e "SELECT VERSION();")
+            echo "DBVERSION=$version" >> $GITHUB_OUTPUT
+            echo "🐬 ${{ vars.DIALECT }} Version : $version " >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ vars.DIALECT }}" = "postgresql" ]; then
+            echo "- Dialeto selecionado foi o 🐘 ${{ vars.DIALECT }} "
+            version=$(psql -U ghrunner -d ${{ secrets.DATABASE }} -c "SHOW server_version;" -tA)
+            echo "DBVERSION=$version" >> $GITHUB_OUTPUT
+            echo "🐘 ${{ vars.DIALECT }} Version : $version" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ vars.DIALECT }}" = "oracle" ]; then
+            echo "- Dialeto selecionado foi o ⭕ ${{ vars.DIALECT }} "
+          elif [ "${{ vars.DIALECT }}" = "sqlserver" ]; then
+            echo "- Dialeto selecionado foi o 🪟 ${{ vars.DIALECT }} "
+          else
+            echo "- Dialeto selecionado foi o ❓ ${{ vars.DIALECT }} "
+          fi
+
+  bkpgen:
+    name: Generating backup
+    needs: [dbversion, chkvariables, dbconnect]
+    runs-on: production
+    environment: production
+    steps:
+      - name: Backup Database
+        id: dbbackup
+        run: |
+          if [ "${{ vars.DIALECT }}" = "mysql" ]; then
+            echo "- Dialeto selecionado foi o 🐬 ${{ vars.DIALECT }} "
+            /usr/bin/mysqldump -u ${{ secrets.USERNAME }} -p${{ secrets.PASSWORD }} --no-data --databases ${{ secrets.DATABASE }} --ignore-table=${{ secrets.DATABASE }}.flyway_schema_history --no-tablespaces > database.dmp
+            BKPRESULT=$(ls -al *.dmp)
+            echo "Ficheiro de Backup criado : database.dmp " >> $GITHUB_STEP_SUMMARY
+            echo "Pulou : " >> $GITHUB_STEP_SUMMARY
+            ls -al database.dmp >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ vars.DIALECT }}" = "postgresql" ]; then
+            echo "- Dialeto selecionado foi o 🐘 ${{ vars.DIALECT }} "
+            /usr/bin/pg_dump -U ghrunner --no-owner --no-acl --schema-only --dbname=${{ secrets.DATABASE }} --exclude-table=flyway_schema_history -F c -b -v -f database.dmp
+            BKPRESULT=$(ls -al *.dmp)
+            echo "Ficheiro de Backup criado : database.dmp " >> $GITHUB_STEP_SUMMARY
+            echo "Pulou : " >> $GITHUB_STEP_SUMMARY
+            ls -al database.dmp >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ vars.DIALECT }}" = "oracle" ]; then
+            echo "- Dialeto selecionado foi o ⭕ ${{ vars.DIALECT }} "
+          elif [ "${{ vars.DIALECT }}" = "sqlserver" ]; then
+            echo "- Dialeto selecionado foi o 🪟 ${{ vars.DIALECT }} "
+          else
+            echo "- Dialeto selecionado foi o ❓ ${{ vars.DIALECT }} "
+          fi
+
+  dummyenv:
+    name: Create Dummy environment
+    needs: [dbconnect, dbversion]
+    runs-on: production
+    environment: test
+    steps:
+      - name: Stop Existing Container
+        run: |
+          docker stop ${{ github.event.repository.name }} || true
+
+      - name: Remove Existing Container
+        run: |
+          docker rm --force ${{ github.event.repository.name }} || true
+          docker rm --force ${{ github.event.repository.name }} || true
+
+      - name: Remove Existing Image
+        run: |
+          docker rmi --force docker.io/library/${{ vars.DIALECT }} || true
+
+      - name: Creating init-db.sql Script
+        run: |
+          if [ "${{ vars.DIALECT }}" = "mysql" ]; then
+            echo "- Dialeto selecionado foi o 🐬 ${{ vars.DIALECT }} "
+            # Create init-db.sql script
+            echo "CREATE USER '${{ secrets.USERNAME }}'@'%' IDENTIFIED BY '${{ secrets.PASSWORD }}'; GRANT ALL PRIVILEGES ON ${{ secrets.DATABASE }}.* TO '${{ secrets.USERNAME }}'@'%'; FLUSH PRIVILEGES; QUIT;" > init-db.sql
+          elif [ "${{ vars.DIALECT }}" = "postgresql" ]; then
+            echo "- Dialeto selecionado foi o 🐘 ${{ vars.DIALECT }} "
+            # Create init-db.sql script
+            echo "CREATE USER ${{ secrets.USERNAME }} WITH PASSWORD '${{ secrets.PASSWORD }}'; GRANT ALL PRIVILEGES ON DATABASE ${{ secrets.DATABASE }} TO ${{ secrets.USERNAME }};" > init-db.sql
+          elif [ "${{ vars.DIALECT }}" = "oracle" ]; then
+            echo "- Dialeto selecionado foi o ⭕ ${{ vars.DIALECT }} "
+          elif [ "${{ vars.DIALECT }}" = "sqlserver" ]; then
+            echo "- Dialeto selecionado foi o 🪟 ${{ vars.DIALECT }} "
+          else
+            echo "- Dialeto selecionado foi o ❓ ${{ vars.DIALECT }} "
+          fi
+
+      - name: Run Container
+        id: runcontainer
+        run: |
+          if [ "${{ vars.DIALECT }}" = "mysql" ]; then
+            echo "- Dialeto selecionado foi o 🐬 ${{ vars.DIALECT }} "
+            DBROOTPASSWD=$(openssl rand -base64 12)
+            echo "message=I GOT IN MYSQL CONDITIONAL" >> $GITHUB_OUTPUT
+            echo "RPWD=$DBROOTPASSWD" >> $GITHUB_OUTPUT
+            echo "Generated temporary root password: $DBROOTPASSWD" >> $GITHUB_STEP_SUMMARY
+            docker run -d --name ${{ github.event.repository.name }} -p 5654:3306 -e MYSQL_ROOT_PASSWORD=$DBROOTPASSWD -e MYSQL_DATABASE=${{ secrets.DATABASE }} docker.io/library/${{ vars.DIALECT }}
+            echo "⏰ Force Sleep for 30 seconds for it to wake up"
+            sleep 30
+            docker exec -i ${{ github.event.repository.name }} mysql -u root -p$DBROOTPASSWD ${{ secrets.DATABASE }} < init-db.sql
+          elif [ "${{ vars.DIALECT }}" = "postgresql" ]; then
+            echo "- Dialeto selecionado foi o 🐘 ${{ vars.DIALECT }} "
+            DBROOTPASSWD=$(openssl rand -base64 12)
+            echo "message=I GOT IN POSTGRES CONDITIONAL" >> $GITHUB_OUTPUT
+            echo "RPWD=$DBROOTPASSWD" >> $GITHUB_OUTPUT
+            echo "Generated temporary root password: $DBROOTPASSWD" >> $GITHUB_STEP_SUMMARY
+            docker run -d --name ${{ github.event.repository.name }} -p 5577:5432 -e POSTGRES_PASSWORD=$DBROOTPASSWD -e POSTGRES_DB=${{ secrets.DATABASE }} postgres
+            echo "⏰ Force Sleep for 30 seconds for it to wake up"
+            sleep 30
+            docker cp init-db.sql ${{ github.event.repository.name }}:/init-db.sql
+            docker exec -i ${{ github.event.repository.name }} psql -U postgres -d ${{ secrets.DATABASE }} -f /init-db.sql
+          elif [ "${{ vars.DIALECT }}" = "oracle" ]; then
+            echo "- Dialeto selecionado foi o ⭕ ${{ vars.DIALECT }} "
+          elif [ "${{ vars.DIALECT }}" = "sqlserver" ]; then
+            echo "- Dialeto selecionado foi o 🪟 ${{ vars.DIALECT }} "
+          else
+            echo "- Dialeto selecionado foi o ❓ ${{ vars.DIALECT }} "
+          fi
+    outputs:
+      RPWD: ${{ steps.runcontainer.outputs.RPWD }}
+
+  dummyconnect:
+    name: Connect to Dummy DB
+    needs: [bkpgen, dbversion, dummyenv]
+    runs-on: production
+    environment: test
+    steps:
+      - name: Test Connection to Dummy DB
+        id: testenv
+        run: |
+          if [ "${{ vars.DIALECT }}" = "mysql" ]; then
+            DMHOST=$(echo "${{ secrets.JDBC }}" | sed 's/.*\/\/\([^:]*\).*/\1/')
+
+            CONTPORT=$(docker inspect ${{ github.event.repository.name }} | jq -r '.[] | .NetworkSettings.Ports | to_entries[] | select(.key | startswith("3306/tcp")) | .value[0].HostPort')
+            DMRESULT=$(mysql -u ${{ secrets.USERNAME }} -p${{ secrets.PASSWORD }} ${{ secrets.DATABASE }} -P $CONTPORT -s --skip-column-names -e "SELECT 1;")
+            echo "DMR=$DMRESULT" >> $GITHUB_OUTPUT
+            echo "CPORT=$CONTPORT" >> $GITHUB_OUTPUT
+            echo $DMRESULT
+            if [ "$DMRESULT" == "1" ]; then
+              echo "🐬 Host: $DMHOST on Port: $CONTPORT" >> $GITHUB_STEP_SUMMARY
+              echo "🐬 Connection Successful :green_circle: " >> $GITHUB_STEP_SUMMARY
+            else
+              echo "🐬 Host: $DMHOST on Port: $CONTPORT" >> $GITHUB_STEP_SUMMARY
+              echo "🐬 Connection Failed :red_circle: " >> $GITHUB_STEP_SUMMARY
+              exit 1
+            fi
+          elif [ "${{ vars.DIALECT }}" = "postgresql" ]; then
+            DMHOST=$(echo "${{ secrets.JDBC }}" | sed 's/.*\/\/\([^:]*\).*/\1/')
+            CONTPORT=$(docker inspect ${{ github.event.repository.name }} | jq -r '.[] | .NetworkSettings.Ports | to_entries[] | select(.key | startswith("5432/tcp")) | .value[0].HostPort')
+            DMRESULT=$(PGPASSWORD=${{ secrets.PASSWORD }} psql -h $DMHOST -U ${{ secrets.USERNAME }} -d ${{ secrets.DATABASE }} -p $CONTPORT -c "SELECT 1;" -tA)
+            echo "DMR=$DMRESULT" >> $GITHUB_OUTPUT
+            echo $DMRESULT
+            echo "CPORT=$CONTPORT" >> $GITHUB_OUTPUT
+            if [[ "$DMRESULT" == "1" ]]; then
+              echo "🐘 Host: $DMHOST on Port: $CONTPORT" >> $GITHUB_STEP_SUMMARY
+              echo "🐘 Connection Successful :green_circle: " >> $GITHUB_STEP_SUMMARY
+            else
+              echo "🐘 Host: $DMHOST on Port: $CONTPORT" >> $GITHUB_STEP_SUMMARY
+              echo "🐘 Connection Failed :red_circle: " >> $GITHUB_STEP_SUMMARY
+              exit 1
+            fi
+          elif [ "${{ vars.DIALECT }}" = "oracle" ]; then
+            echo "- Dialeto selecionado foi o ⭕ ${{ vars.DIALECT }} "
+          elif [ "${{ vars.DIALECT }}" = "sqlserver" ]; then
+            echo "- Dialeto selecionado foi o 🪟 ${{ vars.DIALECT }} "
+          else
+            echo "- Dialeto selecionado foi o ❓ ${{ vars.DIALECT }} "
+          fi
+    outputs:
+      CPORT: ${{ steps.testenv.outputs.CPORT }}
+      DMR: ${{ steps.testenv.outputs.DMR }} 
+
+
+  restoretodummy:
+    name: Restore to Dummy DB
+    needs: [dummyconnect, dummyenv]
+    runs-on: production
+    environment: test
+    steps:
+      - name: Restore to Dummy DB
+        id: restdummy
+        continue-on-error: true
+        run: |
+          echo "${{ needs.dummyconnect.outputs.DMR }}"
+          echo "${{ needs.dummyenv.outputs.RPWD }}"
+          if [ "${{ vars.DIALECT }}" = "mysql" ]; then
+            echo "${{ needs.dummyenv.outputs.RPWD }}"
+            echo "I'm in MYSQL 🐬"
+            if [ "${{ needs.dummyconnect.outputs.DMR }}" == "1" ]; then
+              echo ${{ needs.dummyenv.outputs.RPWD }}
+              docker exec -i ${{ github.event.repository.name }} mysql -u root -p${{ needs.dummyenv.outputs.RPWD }} < database.dmp
+              echo "🐬 Database restored successfully" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "🐬 Connection Failed :red_circle: " >> $GITHUB_STEP_SUMMARY
+              exit 1
+            fi
+          elif [ "${{ vars.DIALECT }}" = "postgresql" ]; then
+            echo "${{ needs.dummyenv.outputs.RPWD }}"
+            echo "I'm in POSTGRES 🐘"
+            if [[ "${{ needs.dummyconnect.outputs.DMR }}" == "1" ]]; then
+              docker cp database.dmp ${{ github.event.repository.name }}:/database.dmp
+              docker exec -i ${{ github.event.repository.name }} sh -c "PGPASSWORD=${{ secrets.PASSWORD }} pg_restore --no-owner -U ${{ secrets.USERNAME }} -d ${{ secrets.DATABASE }} -v /database.dmp"
+              echo "🐘 Database restored successfully" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "🐘 Connection Failed :red_circle: " >> $GITHUB_STEP_SUMMARY
+              exit 1
+            fi
+          elif [ "${{ vars.DIALECT }}" = "oracle" ]; then
+            echo "- Dialeto selecionado foi o ⭕ ${{ vars.DIALECT }} "
+          elif [ "${{ vars.DIALECT }}" = "sqlserver" ]; then
+            echo "- Dialeto selecionado foi o 🪟 ${{ vars.DIALECT }} "
+          else
+            echo "- Dialeto selecionado foi o ❓ ${{ vars.DIALECT }} "
+          fi
+  dummy:
+    name: Deploy Dummy - Migration
+    needs: [restoretodummy]
+    runs-on: production
+    environment: "test"
+    steps:
+      - name: Checkout this wonderful project
+        uses: actions/checkout@v4
+
+      - name: Authenticate with Flyway
+        run: |
+          /opt/flyway/flyway/flyway auth -user="${{ secrets.FLYWAY_USER }}" -password="${{ secrets.FLYWAY_PASSWORD }}" -logout
+        shell: bash
+
+    # Runs the Flyway Migrate against the Production database
+      - name: Migrate Build DB
+        if: ${{ true }}
+        run: |
+          FLYWAY_OUTPUT_FILE=$(mktemp)
+          eval /opt/flyway/flyway/flyway -user="${{ secrets.userName }}" -password="${{ secrets.password }}" -baselineOnMigrate="true" -configFiles="${{ GITHUB.WORKSPACE }}/flyway.toml" -locations="filesystem:${{ GITHUB.WORKSPACE }}/*/migrations" info migrate info -url="${{ secrets.JDBC }}" -cleanDisabled='false' | tee "$FLYWAY_OUTPUT_FILE"
+          echo ":rocket:" >> $GITHUB_STEP_SUMMARY
+          RESULT=$(cat $FLYWAY_OUTPUT_FILE  | sed '/+-----------+-------------+-------------+------+---------------------+---------+----------+/d' | grep "Schema version" -A9999 | tail -n +3 )
+          html_table=$(echo "$RESULT" | awk 'BEGIN {
+          FS="|";
+          print "<table>";
+          print "<tr><th>Category</th><th>Version</th><th>Description</th><th>Type</th><th>Installed On</th><th>State</th><th>Undoable</th></tr>"
+          }
+          NR>2 && NF {
+          gsub(/^ +| +$/,"",$2);
+          gsub(/^ +| +$/,"",$3);
+          gsub(/^ +| +$/,"",$4);
+          gsub(/^ +| +$/,"",$5);
+          gsub(/^ +| +$/,"",$6);
+          gsub(/^ +| +$/,"",$7);
+          state = $7;
+          if (state == "Success") {
+          state = state " :green_circle: ";
+          }
+          else 
+            state = state " :red_circle: " 
+          gsub(/^ +| +$/,"",$8);
+          print "<tr><td>"$2"</td><td>"$3"</td><td>"$4"</td><td>"$5"</td><td>"$6"</td><td>"state"</td><td>"$8"</td></tr>"
+          }
+          END {
+          print "</table>"
+          }')
+          echo "$html_table" >> $GITHUB_STEP_SUMMARY
+        shell: bash
+        
+  prod:
+    name: Deploy Production - Migration
+    needs: [dummy]
+    runs-on: production
+    environment: "production"
+    steps:
+      - name: Checkout this wonderful project
+        uses: actions/checkout@v4
+
+      - name: Authenticate with Flyway
+        run: |
+          /opt/flyway/flyway/flyway auth -user="${{ secrets.FLYWAY_USER }}" -password="${{ secrets.FLYWAY_PASSWORD }}" -logout
+        shell: bash
+
+    # Runs the Flyway Migrate against the Production database
+      - name: Migrate Build DB
+        if: ${{ true }}
+        run: |
+          FLYWAY_OUTPUT_FILE=$(mktemp)
+          eval /opt/flyway/flyway/flyway -user="${{ secrets.userName }}" -password="${{ secrets.password }}" -baselineOnMigrate="true" -configFiles="${{ GITHUB.WORKSPACE }}/flyway.toml" -locations="filesystem:${{ GITHUB.WORKSPACE }}/*/migrations" info migrate info -url="${{ secrets.JDBC }}" -cleanDisabled='false' | tee "$FLYWAY_OUTPUT_FILE"
+          echo ":rocket:" >> $GITHUB_STEP_SUMMARY
+          RESULT=$(cat $FLYWAY_OUTPUT_FILE  | sed '/+-----------+-------------+-------------+------+---------------------+---------+----------+/d' | grep "Schema version" -A9999 | tail -n +3 )
+          html_table=$(echo "$RESULT" | awk 'BEGIN {
+          FS="|";
+          print "<table>";
+          print "<tr><th>Category</th><th>Version</th><th>Description</th><th>Type</th><th>Installed On</th><th>State</th><th>Undoable</th></tr>"
+          }
+          NR>2 && NF {
+          gsub(/^ +| +$/,"",$2);
+          gsub(/^ +| +$/,"",$3);
+          gsub(/^ +| +$/,"",$4);
+          gsub(/^ +| +$/,"",$5);
+          gsub(/^ +| +$/,"",$6);
+          gsub(/^ +| +$/,"",$7);
+          state = $7;
+          if (state == "Success") {
+          state = state " :green_circle: ";
+          }
+          else 
+            state = state " :red_circle: " 
+          gsub(/^ +| +$/,"",$8);
+          print "<tr><td>"$2"</td><td>"$3"</td><td>"$4"</td><td>"$5"</td><td>"$6"</td><td>"state"</td><td>"$8"</td></tr>"
+          }
+          END {
+          print "</table>"
+          }')
+          echo "$html_table" >> $GITHUB_STEP_SUMMARY
+        shell: bash
+        
